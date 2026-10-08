@@ -85,7 +85,7 @@ public class MainActivity extends Activity {
         if (req != REQ_CHOOSER || filePathCallback == null) return;
         Uri[] out = null;
         if (res == RESULT_OK) {
-            out = FileChooserParams.parseResult(res, data);
+            out = WebChromeClient.FileChooserParams.parseResult(res, data);
             if (out == null || out.length == 0) { // снято на камеру
                 if (new File(getCacheDir(), "fm_photo.jpg").length() > 0) out = new Uri[]{imgUri};
                 else if (new File(getCacheDir(), "fm_video.mp4").length() > 0) out = new Uri[]{vidUri};
