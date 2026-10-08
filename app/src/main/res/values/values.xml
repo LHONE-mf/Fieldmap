@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Полевая карта</string>
+    <color name="ic_bg">#17313a</color>
+    <style name="AppTheme" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:statusBarColor">#17313a</item>
+        <item name="android:navigationBarColor">#17313a</item>
+        <item name="android:windowBackground">#f3f1ea</item>
+    </style>
+</resources>
