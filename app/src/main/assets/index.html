@@ -202,7 +202,22 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
 </style>
 </head>
 <body>
-
+<script>
+window.addEventListener('error',function(e){
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#b3261e;color:#fff;font:11px/1.5 monospace;padding:10px;border-radius:8px;white-space:pre-wrap';
+  d.textContent='Ошибка: '+e.message+' | строка '+e.lineno+':'+e.columnNumber;
+  document.body.appendChild(d);
+},true);
+setTimeout(function(){
+  if(!window.__booted){
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;left:8px;right:8px;top:60px;z-index:99999;background:#8a5a00;color:#fff;font:11px/1.5 monospace;padding:10px;border-radius:8px';
+    d.textContent='Скрипт карты не запустился — файл повреждён или обрезан.';
+    document.body.appendChild(d);
+  }
+},2000);
+</script>
 <header id="topbar">
   <span class="logo"><i></i>ПОЛЕВАЯ КАРТА</span>
   <div id="searchWrap">
@@ -1330,6 +1345,7 @@ function rebuildAll(){
       toast('Карта создана. Всё хранится на этом устройстве');
     }
     if(state.settings.minimap)mm.classList.remove('hidden');
+    window.__booted=true;
   }catch(e){
     document.body.insertAdjacentHTML('beforeend',
       `<div style="position:fixed;inset:0;background:#f3f1ea;display:flex;align-items:center;justify-content:center;padding:24px;font:14px/1.6 Verdana;color:#17313a;z-index:999">Не удалось открыть хранилище браузера.<br>Обновите компонент «Android System WebView».<br><small>${esc(e.message||e)}</small></div>`);
