@@ -88,6 +88,19 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
 .node.root .n-tgl{background:var(--amber);color:var(--ink)}
 .node.root.shape-circle{width:170px}
 
+/* взрыв-схема файлов */
+.fchip{position:absolute;width:92px;background:#fff;border:1.5px solid var(--ink);border-radius:10px;
+  box-shadow:2px 3px 0 rgba(23,49,58,.18);z-index:7;text-align:center;padding:5px;cursor:pointer;touch-action:none;
+  animation:fpop .22s ease}
+@keyframes fpop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.fchip .fc-img{height:56px;display:flex;align-items:center;justify-content:center;background:#f1efe7;border-radius:6px;overflow:hidden;font-size:22px}
+.fchip .fc-img img{width:100%;height:100%;object-fit:cover}
+.fchip .fc-nm{font-family:var(--mono);font-size:8.5px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fchip .fc-sz{font-family:var(--mono);font-size:8px;color:#8d8672}
+.fchip.add{background:#fff8e6;height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.fchip.add b{font-size:22px;line-height:1}
+.fchip.add span{font-family:var(--mono);font-size:9px;color:var(--ink2)}
+
 #rail{position:fixed;z-index:55;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}
 #rail button{width:42px;height:42px;background:#fff;border:1.5px solid var(--ink);border-radius:10px;
   box-shadow:2px 3px 0 rgba(23,49,58,.18);font-family:var(--mono);font-size:15px;display:flex;align-items:center;justify-content:center}
@@ -202,7 +215,7 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
 <div id="board">
   <div id="world"><svg id="edges" aria-hidden="true"></svg></div>
 </div>
-<div id="boardHint">тяните фон — панорама · узлы двигаются свободно · двойной тап — новый узел</div>
+<div id="boardHint">тяните фон — панорама · тап по узлу — раскрыть его файлы лучами · двойной тап — новый узел</div>
 
 <div id="rail">
   <button id="zoomIn">+</button>
@@ -248,7 +261,7 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
   <div class="sh-bd">
     <div class="fld"><label>МИНИКАРТА</label><button class="btn ghost" id="setMinimap" style="width:100%"></button></div>
     <div class="fld"><label>ХРАНИЛИЩЕ</label><div class="meta-line" id="setStorage" style="margin:0">…</div></div>
-    <div class="meta-line" style="margin:0">узлы двигаются свободно · ✳ раскладывает ветки лучами · документы открываются во внешних приложениях, изменения подхватываются после возврата · бэкап сохраняется через «Сохранить как…»</div>
+    <div class="meta-line" style="margin:0">тап по узлу раскрывает его файлы взрыв-схемой · документы открываются во внешних приложениях, изменения подхватываются после возврата · бэкап сохраняется через «Сохранить как…»</div>
   </div>
 </div></div>
 
@@ -335,11 +348,13 @@ let db;
 const state={rootId:null,nodes:[],attachments:[],view:{x:0,y:0,z:1},settings:{minimap:false}};
 let selected=null,editing=null,editorAtts=[],lastVis=new Set(),pending=null,searchQ='';
 let qaTarget=null,qaPos=null,qaColor=PALETTE[0],qaShape='rect',mediaTarget=null,replaceTarget=null;
+let burstId=null;const burstChips=[];
 const nodeEl=new Map(),thumbCache=new Map();
 const boardEl=$('#board'),world=$('#world'),svg=$('#edges');
 const root=()=>state.nodes.find(n=>n.id===state.rootId);
 const kidsOf=pid=>state.nodes.filter(n=>n.parentId===pid);
 const nodeById=id=>state.nodes.find(n=>n.id===id);
+const attsOf=nodeId=>state.attachments.filter(a=>a.nodeId===nodeId);
 function descendants(id){const s=new Set(),q=[id];while(q.length){const c=q.shift();
   state.nodes.forEach(n=>{if(n.parentId===c&&!s.has(n.id)){s.add(n.id);q.push(n.id)}})}return s}
 
@@ -351,7 +366,8 @@ window.__apkFileUpdated=async(attId,b64)=>{
   try{await attPut({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts,blob})}catch(e){}
   thumbCache.delete(attId);
   refresh();
-  if(editing===a.nodeId){editorAtts=state.attachments.filter(x=>x.nodeId===a.nodeId);renderEditorMedia()}
+  if(editing===a.nodeId){editorAtts=attsOf(a.nodeId);renderEditorMedia()}
+  queueSave();
   toast('Файл обновлён: '+a.name);
 };
 
@@ -366,8 +382,16 @@ const kvSet=(k,v)=>new Promise((res,rej)=>{const tx=db.transaction('kv','readwri
 const attPut=a=>new Promise((res,rej)=>{const tx=db.transaction('att','readwrite');tx.objectStore('att').put(a);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});
 const attGet=id=>new Promise((res,rej)=>{const q=db.transaction('att').objectStore('att').get(id);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});
 const attDel=id=>new Promise(res=>{const tx=db.transaction('att','readwrite');tx.objectStore('att').delete(id);tx.oncomplete=res});
+const attAll=()=>new Promise((res,rej)=>{const out=[];
+  const cur=db.transaction('att').objectStore('att').openCursor();
+  cur.onsuccess=e=>{const c=e.target.result;if(c){out.push(c.value);c.continue()}else res(out)};
+  cur.onerror=()=>rej(cur.error)});
 
-const saveBoard=()=>kvSet('board',{v:DATA_VER,rootId:state.rootId,nodes:state.nodes,view:state.view,settings:state.settings});
+/* при каждом сохранении фиксируем и список вложений (фикс потери файлов) */
+const saveBoard=async()=>{
+  await kvSet('board',{v:DATA_VER,rootId:state.rootId,nodes:state.nodes,view:state.view,settings:state.settings});
+  await kvSet('attachments',state.attachments.map(({blob,thumbBlob,...r})=>r));
+};
 const queueSave=(()=>{const dot=$('#saveDot');const go=debounce(async()=>{dot.classList.add('busy');
   try{await saveBoard()}catch(e){toast('Ошибка сохранения: '+e.message)}dot.classList.remove('busy')},350);
   return()=>{dot.classList.add('busy');go()}})();
@@ -377,8 +401,24 @@ async function loadOrSeed(){
   if(d&&d.nodes){state.rootId=d.rootId;state.nodes=d.nodes;
     state.view=Object.assign({x:40,y:80,z:1},d.view);
     state.settings=Object.assign({minimap:false},d.settings);
-    state.attachments=await kvGet('attachments')||[];return false}
+    state.attachments=await kvGet('attachments')||[];
+    await recoverOrphanAtts();
+    return false}
   seed();return true;
+}
+/* восстановление вложений, потерянных в старых версиях */
+async function recoverOrphanAtts(){
+  try{
+    const all=await attAll();
+    const known=new Set(state.attachments.map(a=>a.id));
+    const nodeIds=new Set(state.nodes.map(n=>n.id));
+    const orphans=all.filter(a=>!known.has(a.id)&&nodeIds.has(a.nodeId));
+    if(orphans.length){
+      orphans.forEach(a=>state.attachments.push({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts}));
+      await kvSet('attachments',state.attachments.map(({blob,thumbBlob,...r})=>r));
+      setTimeout(()=>toast(`Восстановлено потерянных вложений: ${orphans.length}`),800);
+    }
+  }catch(e){}
 }
 function seed(){
   const now=Date.now();
@@ -420,7 +460,7 @@ function applyNode(n){
   const st=el.querySelector('.n-status');
   if(n.status&&STATUS[n.status]){st.textContent=STATUS[n.status].l;st.style.background=STATUS[n.status].c;st.style.display='inline-block'}
   else st.style.display='none';
-  const atts=state.attachments.filter(a=>a.nodeId===n.id);
+  const atts=attsOf(n.id);
   const ck=n.checklist||[],done=ck.filter(x=>x.d).length;
   let foot='';
   if(atts.length)foot+=`<span class="n-att-thumb"></span><span>📎${atts.length}</span>`;
@@ -453,6 +493,7 @@ function refresh(){
   measureVisible();
   state.nodes.forEach(n=>{const el=nodeEl.get(n.id);if(el&&n.x!==undefined){el.style.left=n.x+'px';el.style.top=n.y+'px'}});
   drawEdges();updateMinimap();
+  if(burstId)updateBurstPositions();
 }
 function anchor(n,tx,ty){
   const cx=n.x+n._w/2, cy=n.y+n._h/2;
@@ -483,7 +524,72 @@ function drawEdges(){
     if(searchQ&&!matchNode(n))path.classList.add('dim');
     svg.appendChild(path);
   });
+  /* лучи взрыв-схемы файлов */
+  if(burstId){
+    const bn=nodeById(burstId);
+    if(bn&&lastVis.has(burstId)){
+      burstChips.forEach(c=>{
+        const A=anchor(bn,c.x,c.y);
+        const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d',`M ${A.x} ${A.y} L ${c.x} ${c.y}`);
+        path.setAttribute('stroke','#8d8672');
+        path.setAttribute('stroke-width','1.4');
+        path.setAttribute('stroke-dasharray','5 4');
+        path.setAttribute('opacity','.75');
+        svg.appendChild(path);
+      });
+    }
+  }
 }
+
+/* ===== взрыв-схема файлов ===== */
+function showBurst(nodeId){
+  hideBurst();
+  const n=nodeById(nodeId);if(!n)return;
+  burstId=nodeId;
+  const atts=attsOf(nodeId);
+  const cx=n.x+n._w/2, cy=n.y+n._h/2;
+  const items=[...atts.map(a=>({att:a})),{add:true}];
+  const R=Math.max(n._w,n._h)/2+95+Math.max(0,items.length-4)*12;
+  items.forEach((it,i)=>{
+    const ang=-Math.PI/2+i*(2*Math.PI/items.length);
+    const x=cx+Math.cos(ang)*R, y=cy+Math.sin(ang)*R;
+    const el=document.createElement('div');
+    el.className='fchip'+(it.add?' add':'');
+    if(it.add){el.innerHTML='<b>＋</b><span>добавить</span>';}
+    else{
+      const a=it.att;
+      const ic=a.type==='image'?'<img alt="">':a.type==='video'?'🎬':(a.name&&/\.(pdf|docx?|xlsx?|pptx?|txt)$/i.test(a.name)?'📄':'🗎');
+      el.innerHTML=`<div class="fc-img">${ic}</div><div class="fc-nm">${esc(a.name)}</div><div class="fc-sz">${fmtBytes(a.size)}</div>`;
+      if(a.type==='image'){const im=el.querySelector('img');
+        thumbURL(a.id).then(u=>{if(u&&im.isConnected)im.src=u})}
+    }
+    el.style.left=(x-46)+'px';el.style.top=(y-47)+'px';
+    world.appendChild(el);
+    burstChips.push({att:it.att||null,add:!!it.add,x,y,ang,R,el});
+    el.addEventListener('pointerdown',e=>e.stopPropagation());
+    tap(el,()=>{buzz(6);
+      if(it.add){mediaTarget=nodeId;openMediaChoice()}
+      else openViewer(it.att.id)});
+  });
+  drawEdges();
+}
+function hideBurst(){
+  burstChips.forEach(c=>c.el.remove());burstChips.length=0;
+  if(burstId){burstId=null;drawEdges()}
+}
+function updateBurstPositions(){
+  if(!burstId)return;
+  const n=nodeById(burstId);
+  if(!n){hideBurst();return}
+  const cx=n.x+n._w/2, cy=n.y+n._h/2;
+  burstChips.forEach(c=>{
+    c.x=cx+Math.cos(c.ang)*c.R;c.y=cy+Math.sin(c.ang)*c.R;
+    c.el.style.left=(c.x-46)+'px';c.el.style.top=(c.y-47)+'px';
+  });
+  drawEdges();
+}
+
 function tidyRadial(){
   const R=185;
   lastVis=visibleSet();
@@ -612,7 +718,7 @@ function bindNode(el,n){
         const w=toWorld(ev.clientX,ev.clientY);
         n.x=w.x-offX;n.y=w.y-offY;
         el.style.left=n.x+'px';el.style.top=n.y+'px';
-        if(!raf){raf=true;requestAnimationFrame(()=>{raf=false;drawEdges()})}
+        if(!raf){raf=true;requestAnimationFrame(()=>{raf=false;drawEdges();if(burstId===n.id)updateBurstPositions()})}
       }
     };
     const up=()=>{
@@ -647,6 +753,7 @@ function setShape(n,shape){
   n.x=cx-n._w/2;n.y=cy-n._h/2;
   el.style.left=n.x+'px';el.style.top=n.y+'px';
   drawEdges();updateMinimap();queueSave();updateSelbar();
+  if(burstId===n.id)updateBurstPositions();
 }
 
 /* ===== выбор и панель действий ===== */
@@ -654,6 +761,9 @@ function setSelected(id){
   selected=id;
   state.nodes.forEach(n=>{const el=nodeEl.get(n.id);el&&el.classList.toggle('sel',n.id===id)});
   updateSelbar();
+  if(id){const n=nodeById(id);
+    if(n&&attsOf(id).length)showBurst(id);else hideBurst();}
+  else hideBurst();
 }
 function updateSelbar(){
   const bar=$('#selbar'),n=selected?nodeById(selected):null;
@@ -663,13 +773,18 @@ function updateSelbar(){
   $('#sbTgl').style.display=kids?'':'none';
   $('#sbTgl').querySelector('b').textContent=n.collapsed?'▸':'⌄';
   $('#sbShape b').textContent=SHAPE_GLYPH[n.shape||'rect'];
+  const cnt=attsOf(n.id).length;
+  $('#sbAtt').lastChild.textContent=cnt?('файлы·'+cnt):'файлы';
   const dot=$('#sbStatus .dot');
   dot.style.background=n.status?STATUS[n.status].c:'#8ea3aa';
   $('#sbStatus').lastChild.textContent=n.status?STATUS[n.status].l.toLowerCase():'статус';
 }
 $('#sbAdd').onclick=()=>{if(selected)openQuickAdd(selected)};
 $('#sbEdit').onclick=()=>{if(selected)openEditor(selected)};
-$('#sbAtt').onclick=()=>{if(selected){mediaTarget=selected;openMediaChoice()}};
+$('#sbAtt').onclick=()=>{const n=nodeById(selected);if(!n)return;
+  if(burstId===n.id)hideBurst();
+  else if(attsOf(n.id).length)showBurst(n.id);
+  else{mediaTarget=n.id;openMediaChoice()}};
 $('#sbStatus').onclick=()=>{const n=nodeById(selected);n&&cycleStatus(n)};
 $('#sbShape').onclick=()=>{const n=nodeById(selected);if(!n)return;
   const order=['rect','circle','ellipse'];
@@ -690,6 +805,7 @@ function deleteNode(id){
   state.attachments=state.attachments.filter(a=>!ids.includes(a.nodeId));
   ids.forEach(i=>{const el=nodeEl.get(i);el&&el.remove();nodeEl.delete(i)});
   if(selected&&ids.includes(selected))selected=null;
+  if(burstId&&ids.includes(burstId))hideBurst();
   updateSelbar();refresh();queueSave();
   lastUndo={snap,snapAtt};pending=goneAtts;
   clearTimeout(pendingTO);pendingTO=setTimeout(()=>{
@@ -767,7 +883,7 @@ function focusNode(id){
 /* ===== редактор ===== */
 function openEditor(id){
   const n=nodeById(id);if(!n)return;
-  editing=id;editorAtts=state.attachments.filter(a=>a.nodeId===id);
+  editing=id;editorAtts=attsOf(id);
   $('#edCap').textContent=n.id===state.rootId?'Корень карты':'Узел';
   $('#edTitle').value=n.title;$('#edDesc').value=n.notes||'';
   $('#edMeta').textContent=`создан ${fmtDate(n.createdAt)} · изменён ${fmtDate(n.updatedAt)}`;
@@ -823,7 +939,8 @@ async function renderEditorMedia(){
     d.querySelector('.att-x').onclick=e=>{e.stopPropagation();
       editorAtts=editorAtts.filter(x=>x.id!==a.id);
       state.attachments=state.attachments.filter(x=>x.id!==a.id);
-      attDel(a.id);renderEditorMedia();refreshQuota();refresh();queueSave()};
+      attDel(a.id);renderEditorMedia();refreshQuota();refresh();queueSave();
+      if(burstId===a.nodeId)showBurst(a.nodeId)};
     d.onclick=()=>{saveEditorFields();openViewer(a.id)};
     grid.appendChild(d);
   }
@@ -915,6 +1032,7 @@ async function addFilesToNode(n,files){
     if(editing===n.id)editorAtts.push(a);
   }
   refresh();if(editing===n.id){renderEditorMedia();refreshQuota()}
+  if(burstId===n.id)showBurst(n.id);
   queueSave();checkQuota();toast(files.length>1?`Прикреплено файлов: ${files.length}`:'Файл прикреплён');
 }
 const thumbURL=async id=>{
@@ -952,7 +1070,9 @@ $('#replaceInput').onchange=async e=>{
   thumbCache.delete(a.id);
   try{await attPut({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts,blob:f})}catch(err){}
   refresh();
-  if(editing===a.nodeId){editorAtts=state.attachments.filter(x=>x.nodeId===a.nodeId);renderEditorMedia();refreshQuota()}
+  if(editing===a.nodeId){editorAtts=attsOf(a.nodeId);renderEditorMedia();refreshQuota()}
+  if(burstId===a.nodeId)showBurst(a.nodeId);
+  queueSave();
   toast('Файл заменён: '+a.name);
 };
 
@@ -1130,7 +1250,6 @@ $('#fileImport').onchange=async e=>{
     state.rootId=d.rootId;state.nodes=d.nodes;state.attachments=atts;
     state.view=Object.assign({x:40,y:80,z:1},d.view);state.settings=Object.assign({minimap:false},d.settings);
     await saveBoard();
-    await kvSet('attachments',state.attachments.map(({blob,thumbBlob,...r})=>r));
     rebuildAll();
     if(state.nodes.some(n=>n.x===undefined||n.x===null))tidyRadial();
     applyView();toast('Данные импортированы');
@@ -1188,6 +1307,7 @@ setTimeout(()=>{$('#boardHint').style.opacity=0},7000);
 /* ===== пересборка и старт ===== */
 function rebuildAll(){
   world.querySelectorAll('.node').forEach(el=>el.remove());nodeEl.clear();
+  hideBurst();
   selected=null;updateSelbar();
   state.nodes.forEach(makeNodeEl);
   refresh();
@@ -1202,7 +1322,7 @@ function rebuildAll(){
       if(!first)toast('Старые ветки разложены лучами — дальше двигайте как угодно');
     }else applyView();
     if(first){
-      await saveBoard();await kvSet('attachments',[]);
+      await saveBoard();
       toast('Карта создана. Всё хранится на этом устройстве');
     }
     if(state.settings.minimap)mm.classList.remove('hidden');
