@@ -15,8 +15,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+      - name: Keystore (создать, если отсутствует)
+        run: |
+          if [ ! -f keystore.jks ]; then
+            keytool -genkeypair -v -keystore keystore.jks -alias fieldmap \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass fieldmap123 -keypass fieldmap123 \
+              -dname "CN=Fieldmap, OU=Personal, O=Fieldmap, C=RU"
+          fi
       - run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: fieldmap-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keystore
+          path: keystore.jks
