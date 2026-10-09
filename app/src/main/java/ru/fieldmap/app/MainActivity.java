@@ -72,7 +72,6 @@ public class MainActivity extends Activity {
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    /* ---------- выбор файла: фото-камера / видео-камера / документы ---------- */
     private void launchChooser() {
         File img = new File(getCacheDir(), "fm_photo.jpg"); img.delete();
         File vid = new File(getCacheDir(), "fm_video.mp4"); vid.delete();
@@ -92,7 +91,8 @@ public class MainActivity extends Activity {
         docsPick.setType("*/*");
         docsPick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
 
-        Intent chooser = Intent.createChooser(docsPick, "Выбрать файл");
+        Intent chooser = Intent.createChooser(docsPick, "Выбрать файлы (можно несколько)");
+        chooser.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cam, camv});
         startActivityForResult(chooser, REQ_CHOOSER);
     }
@@ -118,11 +118,17 @@ public class MainActivity extends Activity {
         Uri[] out = null;
         if (res == RESULT_OK) {
             out = WebChromeClient.FileChooserParams.parseResult(res, data);
+            if (out != null) {
+                ArrayList<Uri> clean = new ArrayList<>();
+                for (Uri u : out) if (u != null) clean.add(u);
+                out = clean.toArray(new Uri[0]);
+            }
             if (out == null || out.length == 0) { // снято на камеру
                 if (new File(getCacheDir(), "fm_photo.jpg").length() > 0) out = new Uri[]{imgUri};
                 else if (new File(getCacheDir(), "fm_video.mp4").length() > 0) out = new Uri[]{vidUri};
             }
         }
+        if (out != null && out.length > 1) toast("Выбрано файлов: " + out.length);
         filePathCallback.onReceiveValue(out);
         filePathCallback = null;
     }
@@ -174,7 +180,6 @@ public class MainActivity extends Activity {
         if (changed) saveDocs();
     }
 
-    /* ---------- перехват скачиваний (старый механизм) ---------- */
     private void injectBridge() {
         webView.evaluateJavascript(
             "(function(){if(window.__apkInjected)return;window.__apkInjected=1;" +
@@ -198,7 +203,6 @@ public class MainActivity extends Activity {
     }
 
     class Bridge {
-        /** старая схема: прямое сохранение в «Загрузки» */
         @JavascriptInterface public void saveFile(final String name, String base64, final String mime) {
             try {
                 byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
@@ -214,7 +218,6 @@ public class MainActivity extends Activity {
             } catch (Exception e) { toast("Ошибка сохранения файла"); }
         }
 
-        /** «Сохранить как…» — пользователь сам выбирает место */
         @JavascriptInterface public void saveAs(final String name, String base64, final String mime) {
             pendingSaveBytes = Base64.decode(base64, Base64.DEFAULT);
             pendingSaveName = name;
@@ -242,7 +245,6 @@ public class MainActivity extends Activity {
             pendingSaveBytes = null;
         }
 
-        /** открыть документ во внешнем приложении (просмотр или редактирование) */
         @JavascriptInterface public void openDoc(final String attId, final String name, final String mime, final String b64, final boolean edit) {
             runOnUiThread(() -> {
                 try {
