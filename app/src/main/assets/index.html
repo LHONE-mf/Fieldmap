@@ -45,7 +45,6 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
 #boardHint{position:fixed;z-index:1;left:14px;bottom:calc(70px + env(safe-area-inset-bottom));
   font-family:var(--mono);font-size:11px;color:#7d8b85;pointer-events:none;transition:opacity .8s}
 
-/* ===== узел ===== */
 .node{position:absolute;width:226px;background:#fff;border:1.5px solid var(--ink);border-radius:10px;
   box-shadow:3px 4px 0 rgba(23,49,58,.16);cursor:grab;z-index:5;display:flex;touch-action:none}
 .node.off{display:none}
@@ -62,7 +61,6 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
   border-radius:12px;background:#fff;border:1.5px solid var(--ink);font-family:var(--mono);font-size:10.5px;
   display:flex;align-items:center;justify-content:center;z-index:6;box-shadow:1px 2px 0 rgba(23,49,58,.2)}
 
-/* формы */
 .node.shape-circle{width:132px;aspect-ratio:1;border-radius:50%;overflow:hidden}
 .node.shape-ellipse{width:206px;border-radius:50%}
 .node.shape-circle,.node.shape-ellipse{background:linear-gradient(180deg,color-mix(in srgb,var(--nc) 22%,#fff),#fff)}
@@ -172,6 +170,8 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
   display:flex;align-items:center;justify-content:center;font-size:14px}
 .menu-item.danger{color:var(--red)}
 .menu-item.danger .mi-ic{border-color:var(--red)}
+.doc-panel{display:flex;flex-direction:column;gap:10px;width:min(320px,86vw)}
+.doc-panel .btn{width:100%}
 
 #viewer{position:fixed;inset:0;z-index:95;background:rgba(14,29,35,.96);display:flex;flex-direction:column}
 #vwTop{display:flex;align-items:center;gap:10px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;color:#e8ecea}
@@ -234,7 +234,7 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
   <div class="sh-hd"><b>Меню</b><button class="sh-close" data-close>✕</button></div>
   <div class="sh-bd">
     <div class="meta-line" id="statLine">…</div>
-    <button class="menu-item" id="miExport"><span class="mi-ic">⤓</span>Экспорт резервной копии (.json)</button>
+    <button class="menu-item" id="miExport"><span class="mi-ic">⤓</span>Экспорт резервной копии (с файлами)</button>
     <button class="menu-item" id="miImport"><span class="mi-ic">⤒</span>Импорт из резервной копии</button>
     <button class="menu-item" id="miFit"><span class="mi-ic">✳</span>Разложить лучами (солнышком)</button>
     <button class="menu-item" id="miShowAll"><span class="mi-ic">▤</span>Показать всю карту</button>
@@ -248,7 +248,7 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
   <div class="sh-bd">
     <div class="fld"><label>МИНИКАРТА</label><button class="btn ghost" id="setMinimap" style="width:100%"></button></div>
     <div class="fld"><label>ХРАНИЛИЩЕ</label><div class="meta-line" id="setStorage" style="margin:0">…</div></div>
-    <div class="meta-line" style="margin:0">узлы двигаются свободно и запоминают место · связи цепляются к ближайшей стороне фигуры · ✳ раскладывает ветки лучами</div>
+    <div class="meta-line" style="margin:0">узлы двигаются свободно · ✳ раскладывает ветки лучами · документы открываются во внешних приложениях, изменения подхватываются после возврата · бэкап сохраняется через «Сохранить как…»</div>
   </div>
 </div></div>
 
@@ -271,7 +271,7 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
     <div class="fld"><label>СТАТУС</label><div class="seg" id="edStatus"></div></div>
     <div class="fld"><label>ЦВЕТ</label><div class="swatches" id="edColors"></div></div>
     <div class="fld"><label>ЧЕКЛИСТ</label><div id="edChecks"></div><button class="ck-add" id="ckAdd">+ пункт</button></div>
-    <div class="fld"><label>ВЛОЖЕНИЯ · ФОТО · ВИДЕО · ФАЙЛЫ</label>
+    <div class="fld"><label>ВЛОЖЕНИЯ · ФОТО · ВИДЕО · ДОКУМЕНТЫ</label>
       <div class="att-grid" id="edMedia"></div>
       <div class="meta-line" id="quotaLine" style="margin-top:8px"></div></div>
     <div class="meta-line" id="edMeta"></div>
@@ -288,7 +288,7 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
 <div id="viewer" class="hidden">
   <div id="vwTop">
     <span id="vwName"></span>
-    <button id="vwDl" title="Скачать">⤓</button>
+    <button id="vwDl" title="Сохранить как…">⤓</button>
     <button id="vwClose">✕</button>
   </div>
   <div id="vwStage"></div>
@@ -299,11 +299,13 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
 <input type="file" id="fileImport" accept="application/json,.json" hidden>
 <input type="file" id="mediaInput" multiple hidden>
 <input type="file" id="mediaCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="replaceInput" hidden>
 
 <script>
 (()=>{'use strict';
 /* ===== утилиты ===== */
 const $=s=>document.querySelector(s);
+const APK=window.AndroidBridge||null;
 const uid=()=>crypto.randomUUID?crypto.randomUUID():'id-'+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
 const debounce=(fn,t)=>{let h;return(...a)=>{clearTimeout(h);h=setTimeout(()=>fn(...a),t)}};
 const fmtBytes=b=>{if(!b&&b!==0)return'';const u=['Б','КБ','МБ','ГБ'];let i=0;while(b>=1024&&i<3){b/=1024;i++}return b.toFixed(b<10&&i>0?1:0)+' '+u[i]};
@@ -312,6 +314,14 @@ const fmtDur=s=>{if(!isFinite(s))return'';s=Math.round(s);return Math.floor(s/60
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 const blobToURL=b=>URL.createObjectURL(b);
+function blobToB64(blob){return new Promise((res,rej)=>{const rd=new FileReader();
+  rd.onload=()=>res(rd.result.split(',')[1]||'');rd.onerror=rej;rd.readAsDataURL(blob)})}
+function b64ToBlob(b64,mime){const bin=atob(b64);const u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  return new Blob([u8],{type:mime||'application/octet-stream'})}
+function strToB64(str){const u8=new TextEncoder().encode(str);let bin='';
+  for(let i=0;i<u8.length;i+=32768)bin+=String.fromCharCode.apply(null,u8.subarray(i,i+32768));
+  return btoa(bin)}
 
 const PALETTE=['#ffd94d','#ffb27a','#9fe3b4','#9fd6ff','#d9c6ff','#ffffff'];
 const STATUS={work:{l:'В РАБОТЕ',c:'#3385d6'},done:{l:'ВЫПОЛНЕНО',c:'#12a15f'},report:{l:'ОТЧЁТ',c:'#e08e0b'}};
@@ -324,7 +334,7 @@ const DB_NAME='field-map',DB_VER=1,DATA_VER=2;
 let db;
 const state={rootId:null,nodes:[],attachments:[],view:{x:0,y:0,z:1},settings:{minimap:false}};
 let selected=null,editing=null,editorAtts=[],lastVis=new Set(),pending=null,searchQ='';
-let qaTarget=null,qaPos=null,qaColor=PALETTE[0],qaShape='rect',mediaTarget=null;
+let qaTarget=null,qaPos=null,qaColor=PALETTE[0],qaShape='rect',mediaTarget=null,replaceTarget=null;
 const nodeEl=new Map(),thumbCache=new Map();
 const boardEl=$('#board'),world=$('#world'),svg=$('#edges');
 const root=()=>state.nodes.find(n=>n.id===state.rootId);
@@ -332,6 +342,18 @@ const kidsOf=pid=>state.nodes.filter(n=>n.parentId===pid);
 const nodeById=id=>state.nodes.find(n=>n.id===id);
 function descendants(id){const s=new Set(),q=[id];while(q.length){const c=q.shift();
   state.nodes.forEach(n=>{if(n.parentId===c&&!s.has(n.id)){s.add(n.id);q.push(n.id)}})}return s}
+
+/* вызывается нативной частью, когда внешний редактор изменил файл */
+window.__apkFileUpdated=async(attId,b64)=>{
+  const a=state.attachments.find(x=>x.id===attId);if(!a)return;
+  const blob=b64ToBlob(b64,a.mime);
+  a.blob=blob;a.size=blob.size;a.ts=Date.now();
+  try{await attPut({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts,blob})}catch(e){}
+  thumbCache.delete(attId);
+  refresh();
+  if(editing===a.nodeId){editorAtts=state.attachments.filter(x=>x.nodeId===a.nodeId);renderEditorMedia()}
+  toast('Файл обновлён: '+a.name);
+};
 
 /* ===== IndexedDB ===== */
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VER);
@@ -421,7 +443,7 @@ const matchNode=n=>(n.title+' '+(n.notes||'')).toLowerCase().includes(searchQ);
 /* ===== свободная раскладка ===== */
 function visibleSet(){const s=new Set();const w=n=>{s.add(n.id);if(!n.collapsed)kidsOf(n.id).forEach(w)};
   const r=root();if(r)w(r);
-  state.nodes.forEach(n=>{if(n.parentId===null&&!s.has(n.id))w(n)}); // свободные узлы без родителя
+  state.nodes.forEach(n=>{if(n.parentId===null&&!s.has(n.id))w(n)});
   return s}
 function measureVisible(){lastVis.forEach(id=>{const n=nodeById(id),el=nodeEl.get(id);
   if(n&&el){n._w=el.offsetWidth;n._h=el.offsetHeight}})}
@@ -462,7 +484,6 @@ function drawEdges(){
     svg.appendChild(path);
   });
 }
-/* автораскладка «солнышком» */
 function tidyRadial(){
   const R=185;
   lastVis=visibleSet();
@@ -576,7 +597,7 @@ function tap(el,fn){
   });
 }
 
-/* ===== узлы: свободное перетаскивание ===== */
+/* ===== узлы ===== */
 function bindNode(el,n){
   el.addEventListener('pointerdown',e=>{
     if(e.target.closest('.n-tgl'))return;
@@ -806,7 +827,7 @@ async function renderEditorMedia(){
     d.onclick=()=>{saveEditorFields();openViewer(a.id)};
     grid.appendChild(d);
   }
-  const add=document.createElement('button');add.id='addMediaBtn';add.innerHTML='<b>＋</b>файл / фото';
+  const add=document.createElement('button');add.id='addMediaBtn';add.innerHTML='<b>＋</b>файл';
   add.onclick=()=>{mediaTarget=editing;openMediaChoice()};grid.appendChild(add);
 }
 function openMediaChoice(){
@@ -814,7 +835,7 @@ function openMediaChoice(){
   ov.innerHTML=`<div class="sheet" style="padding-bottom:calc(12px + env(safe-area-inset-bottom))">
     <div class="sh-bd">
       <button class="menu-item" id="mcCam"><span class="mi-ic">📷</span>Снять фото / видео (камера)</button>
-      <button class="menu-item" id="mcGal"><span class="mi-ic">🖼</span>Выбрать из файлов / галереи</button>
+      <button class="menu-item" id="mcGal"><span class="mi-ic">🖼</span>Выбрать файлы (документы, галерея)</button>
     </div></div>`;
   document.body.appendChild(ov);requestAnimationFrame(()=>ov.classList.add('show'));
   const close=()=>{ov.classList.remove('show');setTimeout(()=>ov.remove(),180)};
@@ -912,6 +933,29 @@ async function refreshQuota(){
 function checkQuota(){try{navigator.storage&&navigator.storage.estimate&&navigator.storage.estimate().then(({usage,quota})=>{
   if(usage>quota*0.7)toast('⚠ Хранилище почти заполнено')})}catch(e){}}
 
+/* ===== открытие документов во внешних приложениях ===== */
+async function openDoc(a,edit){
+  if(!APK||!APK.openDoc){toast('Доступно только в APK-версии');return}
+  const rec=a.blob?a:await attGet(a.id);
+  if(!rec||!rec.blob){toast('Файл не найден в хранилище');return}
+  buzz(8);
+  const b64=await blobToB64(rec.blob);
+  APK.openDoc(a.id,a.name,a.mime||'application/octet-stream',b64,!!edit);
+  toast(edit?'Открываю для редактирования…':'Открываю в приложении…');
+}
+$('#replaceInput').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';
+  const a=replaceTarget;replaceTarget=null;
+  if(!f||!a)return;
+  a.blob=f;a.size=f.size;a.mime=f.type||a.mime;a.name=f.name;a.ts=Date.now();
+  a.type=f.type.startsWith('image/')?'image':f.type.startsWith('video/')?'video':'file';
+  thumbCache.delete(a.id);
+  try{await attPut({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts,blob:f})}catch(err){}
+  refresh();
+  if(editing===a.nodeId){editorAtts=state.attachments.filter(x=>x.nodeId===a.nodeId);renderEditorMedia();refreshQuota()}
+  toast('Файл заменён: '+a.name);
+};
+
 /* ===== просмотр ===== */
 let vwURL=null;
 async function openViewer(attId){
@@ -922,14 +966,32 @@ async function openViewer(attId){
   if(a.type==='image'){const im=document.createElement('img');vwURL=blobToURL(a.blob);im.src=vwURL;stage.appendChild(im)}
   else if(a.type==='video'){const v=document.createElement('video');v.controls=true;v.playsInline=true;
     vwURL=blobToURL(a.blob);v.src=vwURL;stage.appendChild(v);v.play().catch(()=>{})}
-  else stage.innerHTML=`<div style="color:#cfdada;font-family:var(--mono);font-size:13px;text-align:center">Предпросмотра нет.<br>Скачайте файл кнопкой ⤓</div>`;
+  else{
+    stage.innerHTML=`<div class="doc-panel" style="text-align:center;color:#e8ecea">
+      <div style="font-size:42px">📄</div>
+      <div style="font-family:var(--mono);font-size:13px;word-break:break-word;margin:8px 0 16px">${esc(a.name)}<br><span style="color:#8ea3aa">${fmtBytes(a.size)}</span></div>
+      <button id="docOpen" class="btn">Открыть в приложении</button>
+      <button id="docEdit" class="btn amber">Открыть для редактирования</button>
+      <button id="docReplace" class="btn ghost" style="color:#cfdada;border-color:#cfdada">Заменить файл…</button>
+    </div>`;
+    $('#docOpen').onclick=()=>openDoc(a,false);
+    $('#docEdit').onclick=()=>openDoc(a,true);
+    $('#docReplace').onclick=()=>{replaceTarget=a;$('#replaceInput').click()};
+  }
   $('#viewer').dataset.att=attId;$('#viewer').classList.remove('hidden');
 }
 $('#vwClose').onclick=()=>{$('#viewer').classList.add('hidden');$('#vwStage').innerHTML='';
   if(vwURL){URL.revokeObjectURL(vwURL);vwURL=null}};
-$('#vwDl').onclick=async()=>{const a=await attGet($('#viewer').dataset.att);if(!a)return;
-  const u=blobToURL(a.blob),l=document.createElement('a');l.href=u;l.download=a.name;l.click();
-  setTimeout(()=>URL.revokeObjectURL(u),4000)};
+$('#vwDl').onclick=async()=>{
+  const a=await attGet($('#viewer').dataset.att);if(!a||!a.blob)return;
+  if(APK&&APK.saveAs){toast('Подготовка файла…');
+    const b64=await blobToB64(a.blob);
+    APK.saveAs(a.name,b64,a.mime||'application/octet-stream');
+  }else{
+    const u=blobToURL(a.blob),l=document.createElement('a');l.href=u;l.download=a.name;l.click();
+    setTimeout(()=>URL.revokeObjectURL(u),4000);
+  }
+};
 
 /* ===== поиск ===== */
 const searchInp=$('#search');
@@ -1021,13 +1083,34 @@ $('#menuOverlay').querySelector('[data-close]').onclick=()=>closeOverlay($('#men
 $('#miFit').onclick=()=>{closeOverlay($('#menuOverlay'));tidyRadial();toast('Ветки разложены лучами')};
 $('#miShowAll').onclick=()=>{closeOverlay($('#menuOverlay'));fitView()};
 $('#miSettings').onclick=()=>{closeOverlay($('#menuOverlay'));renderSettings();openOverlay($('#setOverlay'))};
-$('#miExport').onclick=()=>{
-  const data={app:'field-map',v:DATA_VER,exportedAt:new Date().toISOString(),
-    rootId:state.rootId,nodes:state.nodes,view:state.view,settings:state.settings,attachments:state.attachments};
-  const u=blobToURL(new Blob([JSON.stringify(data)],{type:'application/json'}));
-  const l=document.createElement('a');l.href=u;l.download='mindmap-backup-'+new Date().toISOString().slice(0,10)+'.json';l.click();
-  setTimeout(()=>URL.revokeObjectURL(u),5000);toast('Резервная копия сохранена');
+
+/* экспорт: бэкап с файлами + выбор места сохранения */
+$('#miExport').onclick=async()=>{
+  toast('Готовлю резервную копию…');
+  try{
+    const atts=[];
+    for(const a of state.attachments){
+      let rec=a;
+      if(!rec.blob){rec=await attGet(a.id)}
+      if(rec&&rec.blob){
+        const data='data:'+(a.mime||'application/octet-stream')+';base64,'+await blobToB64(rec.blob);
+        atts.push({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts,data});
+      }else atts.push({id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts});
+    }
+    const data={app:'field-map',v:DATA_VER,exportedAt:new Date().toISOString(),
+      rootId:state.rootId,nodes:state.nodes,view:state.view,settings:state.settings,attachments:atts};
+    const json=JSON.stringify(data);
+    const name='fieldmap-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    if(APK&&APK.saveAs){APK.saveAs(name,strToB64(json),'application/json')}
+    else{
+      const u=blobToURL(new Blob([json],{type:'application/json'}));
+      const l=document.createElement('a');l.href=u;l.download=name;l.click();
+      setTimeout(()=>URL.revokeObjectURL(u),5000);toast('Резервная копия сохранена');
+    }
+  }catch(e){toast('Не удалось создать копию: '+e.message)}
 };
+
+/* импорт: восстанавливает и файлы */
 $('#miImport').onclick=()=>$('#fileImport').click();
 $('#fileImport').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -1036,10 +1119,18 @@ $('#fileImport').onchange=async e=>{
     const d=JSON.parse(await f.text());
     if(!d.nodes||d.v>DATA_VER)throw new Error('несовместимый файл');
     if(!confirm('Заменить текущую карту данными из копии?'))return;
-    state.rootId=d.rootId;state.nodes=d.nodes;state.attachments=d.attachments||[];
+    const atts=[];
+    for(const a of (d.attachments||[])){
+      if(a.data){
+        try{const blob=b64ToBlob(a.data.split(',')[1]||'',a.mime);
+          const rec={id:a.id,nodeId:a.nodeId,name:a.name,type:a.type,mime:a.mime,size:a.size,ts:a.ts,blob};
+          await attPut(rec);atts.push(rec);}catch(err){}
+      }else{atts.push(a)}
+    }
+    state.rootId=d.rootId;state.nodes=d.nodes;state.attachments=atts;
     state.view=Object.assign({x:40,y:80,z:1},d.view);state.settings=Object.assign({minimap:false},d.settings);
-    for(const a of state.attachments)if(a.blob)await attPut(a);
-    await saveBoard();await kvSet('attachments',state.attachments.map(({blob,thumbBlob,...r})=>r));
+    await saveBoard();
+    await kvSet('attachments',state.attachments.map(({blob,thumbBlob,...r})=>r));
     rebuildAll();
     if(state.nodes.some(n=>n.x===undefined||n.x===null))tidyRadial();
     applyView();toast('Данные импортированы');
