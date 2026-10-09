@@ -443,7 +443,7 @@ function seed(){
   const r=mk(null,'Рабочие дела',{color:'#ffd94d'});state.rootId=r.id;
   const res=mk(r.id,'Исследования материалов',{color:'#9fd6ff',shape:'ellipse'});
   mk(res.id,'Материал А · прочность',{status:'work',color:'#9fd6ff',
-    notes:'Нагрузка 40 кг, серия из 5 прогонов.\nРезультаты заносить сюда.',
+    notes:'Нагрузка 40 кг, серия из 5 прогонов. Результаты заносить сюда.',
     checklist:[{t:'Подготовить образцы',d:true},{t:'Прогнать на стенде',d:false},{t:'Записать цифры',d:false}]});
   mk(res.id,'Материал Б · термостойкость',{status:'done',color:'#9fe3b4',shape:'circle',notes:'180 °C выдержал, деформаций нет.'});
   mk(res.id,'Материал В · влагостойкость',{color:'#ffffff',notes:'План: распыление 48 ч, затем замер массы.'});
@@ -863,9 +863,9 @@ function renderShapeSeg(box,cur,cb){
     box.appendChild(b)});
 }
 $('#qaAdd').onclick=()=>{
-  const lines=$('#qaText').value.trim().split('\n');
+  const lines=$('#qaText').value.trim().split(String.fromCharCode(10));
   const title=(lines.shift()||'').trim();
-  const n={id:uid(),parentId:qaTarget,title:title||'Новый узел',notes:lines.join('\n'),
+  const n={id:uid(),parentId:qaTarget,title:title||'Новый узел',notes:lines.join(String.fromCharCode(10)),
     status:null,shape:qaShape,color:qaColor,checklist:[],collapsed:false,
     x:qaPos.x,y:qaPos.y,createdAt:Date.now(),updatedAt:Date.now()};
   state.nodes.push(n);
@@ -977,7 +977,6 @@ function openMediaChoice(){
   ov.addEventListener('pointerdown',e=>{if(e.target===ov&&Date.now()-born>250)close()});
   ov.querySelector('#mcCam').addEventListener('click',()=>{close();setTimeout(()=>$('#mediaCam').click(),60)});
   ov.querySelector('#mcGal').addEventListener('click',()=>{close();setTimeout(()=>$('#mediaInput').click(),60)});
-}
 }
 $('#mediaInput').onchange=e=>{const f=[...e.target.files];e.target.value='';
   const n=nodeById(mediaTarget);if(n&&f.length)addFilesToNode(n,f)};
