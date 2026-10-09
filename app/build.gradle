@@ -7,13 +7,23 @@ android {
         applicationId "ru.fieldmap.app"
         minSdk 29          // Android 10+
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
     }
-    buildTypes { release { minifyEnabled false } }
+    signingConfigs {
+        common {
+            storeFile rootProject.file('keystore.jks')
+            storePassword 'fieldmap123'
+            keyAlias 'fieldmap'
+            keyPassword 'fieldmap123'
+        }
+    }
+    buildTypes {
+        debug   { signingConfig signingConfigs.common }
+        release { minifyEnabled false; signingConfig signingConfigs.common }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 }
-// намеренно без зависимостей: приложение полностью автономное
