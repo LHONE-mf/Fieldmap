@@ -948,17 +948,21 @@ async function renderEditorMedia(){
   add.onclick=()=>{mediaTarget=editing;openMediaChoice()};grid.appendChild(add);
 }
 function openMediaChoice(){
-  const ov=document.createElement('div');ov.className='overlay';
+  if(document.querySelector('.media-choice'))return;
+  const ov=document.createElement('div');ov.className='overlay media-choice';
   ov.innerHTML=`<div class="sheet" style="padding-bottom:calc(12px + env(safe-area-inset-bottom))">
     <div class="sh-bd">
       <button class="menu-item" id="mcCam"><span class="mi-ic">📷</span>Снять фото / видео (камера)</button>
       <button class="menu-item" id="mcGal"><span class="mi-ic">🖼</span>Выбрать файлы (документы, галерея)</button>
     </div></div>`;
-  document.body.appendChild(ov);requestAnimationFrame(()=>ov.classList.add('show'));
-  const close=()=>{ov.classList.remove('show');setTimeout(()=>ov.remove(),180)};
-  ov.addEventListener('click',e=>{if(e.target===ov)close()});
-  ov.querySelector('#mcCam').onclick=()=>{close();$('#mediaCam').click()};
-  ov.querySelector('#mcGal').onclick=()=>{close();$('#mediaInput').click()};
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>ov.classList.add('show')));
+  const born=Date.now();
+  const close=()=>{if(!ov.isConnected)return;ov.classList.remove('show');setTimeout(()=>ov.remove(),180)};
+  ov.addEventListener('pointerdown',e=>{if(e.target===ov&&Date.now()-born>250)close()});
+  ov.querySelector('#mcCam').addEventListener('click',()=>{close();setTimeout(()=>$('#mediaCam').click(),60)});
+  ov.querySelector('#mcGal').addEventListener('click',()=>{close();setTimeout(()=>$('#mediaInput').click(),60)});
+}
 }
 $('#mediaInput').onchange=e=>{const f=[...e.target.files];e.target.value='';
   const n=nodeById(mediaTarget);if(n&&f.length)addFilesToNode(n,f)};
