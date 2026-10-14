@@ -1,11 +1,16 @@
 package ru.fieldmap.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Base64;
@@ -29,9 +34,10 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private Uri imgUri, vidUri;
-    private static final int REQ_CHOOSER = 42, REQ_CREATE = 43;
+    private static final int REQ_CHOOSER = 42, REQ_CREATE = 43, REQ_NOTIF = 99;
     private byte[] pendingSaveBytes = null;
     private String pendingSaveName = "";
+    private String pendingOpenNode = null;
     private final List<PendingDoc> docs = new ArrayList<>();
     private static class PendingDoc { String attId; String fileName; long mtime; }
 
@@ -40,6 +46,8 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         webView = new WebView(this);
         setContentView(webView);
+
+        createChannel();
 
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
@@ -60,19 +68,73 @@ public class MainActivity extends Activity {
             @Override public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> cb, FileChooserParams params) {
                 if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                 filePathCallback = cb;
-                launchChooser();
+                if (params != null && params.isCaptureEnabled()) launchCamera();
+                else launchDocs();
                 return true;
             }
         });
         webView.setWebViewClient(new WebViewClient() {
-            @Override public void onPageFinished(WebView v, String url) { injectBridge(); }
+            @Override public void onPageFinished(WebView v, String url) {
+                injectBridge();
+                if (pendingOpenNode != null) {
+                    final String nid = pendingOpenNode; pendingOpenNode = null;
+                    webView.postDelayed(() ->
+                        webView.evaluateJavascript("if(window.__apkOpenNode)window.__apkOpenNode('" + nid + "')", null), 700);
+                }
+            }
         });
+
+        if (getIntent() != null) {
+            String nid = getIntent().getStringExtra("nodeId");
+            if (nid != null && !nid.isEmpty()) pendingOpenNode = nid;
+        }
 
         loadDocs();
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    private void launchChooser() {
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        String nid = intent.getStringExtra("nodeId");
+        if (nid != null && !nid.isEmpty() && webView != null) {
+            webView.evaluateJavascript("if(window.__apkOpenNode)window.__apkOpenNode('" + nid + "')", null);
+        }
+    }
+
+    private void createChannel() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null) {
+                NotificationChannel ch = new NotificationChannel(Reminders.CHANNEL_ID,
+                        "Напоминания", NotificationManager.IMPORTANCE_HIGH);
+                ch.enableVibration(true);
+                nm.createNotificationChannel(ch);
+            }
+        }
+    }
+
+    private void ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+        }
+    }
+
+    /* ---------- документы и файлы ---------- */
+    private void launchDocs() {
+        Intent docsPick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        docsPick.addCategory(Intent.CATEGORY_OPENABLE);
+        docsPick.setType("*/*");
+        docsPick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        try { startActivityForResult(docsPick, REQ_CHOOSER); }
+        catch (ActivityNotFoundException e) {
+            toast("На телефоне нет файлового менеджера");
+            filePathCallback = null;
+        }
+    }
+
+    /* ---------- камера ---------- */
+    private void launchCamera() {
         File img = new File(getCacheDir(), "fm_photo.jpg"); img.delete();
         File vid = new File(getCacheDir(), "fm_video.mp4"); vid.delete();
         imgUri = AssetFileProvider.uriFor(this, img.getName());
@@ -86,21 +148,19 @@ public class MainActivity extends Activity {
         camv.putExtra(MediaStore.EXTRA_OUTPUT, vidUri);
         camv.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-        Intent docsPick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        docsPick.addCategory(Intent.CATEGORY_OPENABLE);
-        docsPick.setType("*/*");
-        docsPick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-
-        Intent chooser = Intent.createChooser(docsPick, "Выбрать файлы (можно несколько)");
-        chooser.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cam, camv});
-        startActivityForResult(chooser, REQ_CHOOSER);
+        Intent chooser = Intent.createChooser(cam, "Камера");
+        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camv});
+        try { startActivityForResult(chooser, REQ_CHOOSER); }
+        catch (ActivityNotFoundException e) {
+            toast("Нет приложения камеры");
+            filePathCallback = null;
+        }
     }
 
     @Override protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
 
-        if (req == REQ_CREATE) { // «Сохранить как» для бэкапа / скачивания
+        if (req == REQ_CREATE) {
             if (res == RESULT_OK && data != null && data.getData() != null && pendingSaveBytes != null) {
                 try {
                     OutputStream os = getContentResolver().openOutputStream(data.getData());
@@ -118,22 +178,19 @@ public class MainActivity extends Activity {
         Uri[] out = null;
         if (res == RESULT_OK) {
             out = WebChromeClient.FileChooserParams.parseResult(res, data);
-            if (out != null) {
-                ArrayList<Uri> clean = new ArrayList<>();
-                for (Uri u : out) if (u != null) clean.add(u);
-                out = clean.toArray(new Uri[0]);
-            }
-            if (out == null || out.length == 0) { // снято на камеру
+            if (out == null || out.length == 0) {
                 if (new File(getCacheDir(), "fm_photo.jpg").length() > 0) out = new Uri[]{imgUri};
                 else if (new File(getCacheDir(), "fm_video.mp4").length() > 0) out = new Uri[]{vidUri};
             }
         }
-        if (out != null && out.length > 1) toast("Выбрано файлов: " + out.length);
+        if (res == RESULT_OK && (out == null || out.length == 0)) {
+            toast("Файлы не получены из менеджера");
+        }
         filePathCallback.onReceiveValue(out);
         filePathCallback = null;
     }
 
-    /* ---------- открытые документы: следим за изменениями ---------- */
+    /* ---------- открытые документы ---------- */
     private void loadDocs() {
         try {
             String j = getSharedPreferences("fieldmap", 0).getString("docs", "[]");
@@ -275,6 +332,17 @@ public class MainActivity extends Activity {
                     }
                 } catch (Exception e) { toast("Не удалось открыть файл"); }
             });
+        }
+
+        /* ---------- напоминания ---------- */
+        @JavascriptInterface public void scheduleReminder(final String id, final String title, final String text, final long when) {
+            runOnUiThread(() -> {
+                ensureNotificationPermission();
+                Reminders.schedule(MainActivity.this, id, title, text, when);
+            });
+        }
+        @JavascriptInterface public void cancelReminder(final String id) {
+            runOnUiThread(() -> Reminders.cancel(MainActivity.this, id));
         }
     }
 
