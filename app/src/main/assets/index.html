@@ -57,6 +57,31 @@ body.searching #bottombar,body.searching #selbar,body.searching #rail,body.searc
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .n-foot{display:flex;gap:7px;margin-top:6px;align-items:center;font-family:var(--mono);font-size:10px;color:#8d8672}
 .n-att-thumb img{width:24px;height:24px;object-fit:cover;border-radius:5px;border:1px solid #d9d3c2;display:block}
+  .n-rs{position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;z-index:8;cursor:nwse-resize;touch-action:none}
+.n-rs:after{content:'';position:absolute;right:5px;bottom:5px;width:10px;height:10px;border-right:2.5px solid #8d8672;border-bottom:2.5px solid #8d8672;border-radius:2px}
+.node.sel .n-rs:after,.node.msel .n-rs:after{border-color:var(--blue)}
+.node.msel{box-shadow:0 0 0 3px var(--teal),3px 4px 0 rgba(23,49,58,.16)}
+.node.sized .n-notes{-webkit-line-clamp:unset;display:block}
+#multibar{position:fixed;z-index:59;left:50%;transform:translateX(-50%) translateY(16px);opacity:0;pointer-events:none;
+bottom:calc(74px + env(safe-area-inset-bottom));display:flex;gap:2px;align-items:center;background:var(--teal);border-radius:14px;
+padding:6px;box-shadow:0 8px 20px rgba(13,127,140,.45);transition:.18s;max-width:96vw}
+#multibar.show{transform:translateX(-50%);opacity:1;pointer-events:auto}
+#mbCount{color:#fff;font-family:var(--mono);font-size:11px;padding:0 8px;white-space:nowrap}
+.ver-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1.5px dashed #e7e2d3}
+.ver-row .ver-main{flex:1;min-width:0}
+.ver-row b{font-family:var(--mono);font-size:11px;display:block;color:var(--ink2)}
+.ver-row span{font-size:12.5px;word-break:break-word}
+.bg-grid{display:flex;flex-wrap:wrap;gap:9px}
+.bg-tile{width:88px;border:1.5px solid #cfc9b8;border-radius:9px;background:#fff;padding:6px;font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:5px;align-items:center;color:var(--ink2)}
+.bg-tile.sel{border-color:var(--ink);color:var(--ink);box-shadow:2px 2px 0 rgba(23,49,58,.2)}
+.bgprev{width:100%;height:46px;border-radius:6px;border:1px solid #e2ddcf;display:block}
+.bgprev.dots{background-color:#f3f1ea;background-image:radial-gradient(circle,#c9c3b1 1px,transparent 1.3px);background-size:9px 9px}
+.bgprev.grid{background-color:#f7f5ef;background-image:linear-gradient(rgba(23,49,58,.15) 1px,transparent 1px),linear-gradient(90deg,rgba(23,49,58,.15) 1px,transparent 1px);background-size:9px 9px}
+.bgprev.lines{background-color:#f7f5ef;background-image:repeating-linear-gradient(180deg,transparent 0 8px,rgba(23,49,58,.18) 8px 9px)}
+.bgprev.none{background:#f3f1ea}
+.bgprev.color{background:#cfe3cf}
+.bgprev.gradient{background:linear-gradient(180deg,#f3f1ea,#9fd6ff)}
+#bgColor,#bgC1,#bgC2{width:64px;height:40px;border:1.5px solid #cfc9b8;border-radius:8px;background:#fff;padding:2px}
 .n-due{background:#eef2ea;border:1px solid #cfc9b8;border-radius:4px;padding:1px 5px}
 .n-due.over{background:var(--red);border-color:var(--red);color:#fff;font-weight:bold}
 .rem-row{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1.5px dashed #e7e2d3;cursor:pointer}
@@ -262,7 +287,11 @@ setTimeout(function(){
   <button class="sb" id="sbTgl"><b>⌄</b>свернуть</button>
   <button class="sb danger" id="sbDel"><b>✕</b>удалить</button>
 </div>
-
+<div id="multibar">
+<span id="mbCount">узлов: 0</span>
+<button class="sb" id="mbDone"><b>✓</b>готово</button>
+<button class="sb danger" id="mbDel"><b>✕</b>удалить</button>
+</div>
 <nav id="bottombar">
   <button class="fab primary" id="fabTopic"><span>＋</span><span>узел</span></button>
   <span class="grow"></span>
@@ -277,6 +306,7 @@ setTimeout(function(){
     <button class="menu-item" id="miImport"><span class="mi-ic">⤒</span>Импорт из резервной копии</button>
     <button class="menu-item" id="miFit"><span class="mi-ic">✳</span>Разложить лучами (солнышком)</button>
     <button class="menu-item" id="miShowAll"><span class="mi-ic">▤</span>Показать всю карту</button>
+    <button class="menu-item" id="miBG"><span class="mi-ic">🖼</span>Фон карты</button>
     <button class="menu-item" id="miSettings"><span class="mi-ic">⚙</span>Настройки</button>
     <button class="menu-item danger" id="miWipe"><span class="mi-ic">☒</span>Стереть все данные</button>
   </div>
@@ -316,6 +346,11 @@ setTimeout(function(){
 <div class="seg" id="edDuePresets" style="margin-top:8px"></div>
 </div>
     <div class="fld"><label>ЦВЕТ</label><div class="swatches" id="edColors"></div></div>
+    <div class="fld"><label>РАЗМЕР УЗЛА</label><button class="btn ghost" id="edSizeReset">Сбросить размер</button>
+<div class="meta-line" style="margin:6px 0 0">Чтобы увеличить или уменьшить узел — тяните за уголок ◢ в его правом нижнем углу.</div></div>
+<div class="fld"><label>ИСТОРИЯ ИЗМЕНЕНИЙ</label>
+<div class="meta-line" style="margin:0 0 6px" id="edUpdated"></div>
+<div id="edVersions" style="max-height:180px;overflow-y:auto"></div></div>
     <div class="fld"><label>ЧЕКЛИСТ</label><div id="edChecks"></div><button class="ck-add" id="ckAdd">+ пункт</button></div>
     <div class="fld"><label>ВЛОЖЕНИЯ · ФОТО · ВИДЕО · ДОКУМЕНТЫ</label>
       <div class="att-grid" id="edMedia"></div>
@@ -339,7 +374,29 @@ setTimeout(function(){
   </div>
   <div id="vwStage"></div>
 </div>
-
+<div id="bgOverlay" class="overlay hidden"><div class="sheet">
+<div class="sh-hd"><b>Фон карты</b><button class="sh-close" data-close>✕</button></div>
+<div class="sh-bd">
+<div class="fld"><label>ВАРИАНТЫ ФОНА</label>
+<div class="bg-grid">
+<button class="bg-tile" data-bg="dots"><span class="bgprev dots"></span>Точка</button>
+<button class="bg-tile" data-bg="grid"><span class="bgprev grid"></span>Клетка</button>
+<button class="bg-tile" data-bg="lines"><span class="bgprev lines"></span>Линейка</button>
+<button class="bg-tile" data-bg="none"><span class="bgprev none"></span>Пустой</button>
+<button class="bg-tile" data-bg="color"><span class="bgprev color"></span>Цвет</button>
+<button class="bg-tile" data-bg="gradient"><span class="bgprev gradient"></span>Градиент</button>
+</div></div>
+<div class="fld hidden" id="bgColorFld"><label>ЦВЕТ ФОНА</label><input type="color" id="bgColor" value="#f3f1ea"></div>
+<div class="fld hidden" id="bgGradFld"><label>ГРАДИЕНТ: НАЧАЛО → КОНЕЦ</label>
+<div style="display:flex;gap:10px;align-items:center"><input type="color" id="bgC1" value="#f3f1ea"><span style="font-family:var(--mono)">→</span><input type="color" id="bgC2" value="#9fd6ff"></div></div>
+<div class="fld"><label>ИЗОБРАЖЕНИЕ (без сжатия, оригинал)</label>
+<button class="btn ghost" id="bgImgBtn" style="width:100%">Выбрать изображение…</button>
+<div class="meta-line" id="bgImgInfo" style="margin-top:8px">Изображение не выбрано</div>
+<button class="btn ghost hidden" id="bgImgClear" style="width:100%">Убрать изображение</button>
+</div>
+</div>
+</div></div>
+<input type="file" id="bgInput" accept="image/*" hidden>
 <div id="toast"><span id="toastMsg"></span><button id="toastAct" class="hidden"></button></div>
 <div id="remOverlay" class="overlay hidden"><div class="sheet">
 <div class="sh-hd"><b>Напоминания</b><button class="sh-close" data-close>✕</button></div>
@@ -483,7 +540,7 @@ function makeNodeEl(n){
   el.innerHTML=`<div class="n-accent"></div><div class="n-body">
     <div class="n-top"><span class="n-status"></span><span class="n-title"></span></div>
     <div class="n-notes"></div><div class="n-foot"></div></div>
-    <button class="n-tgl"></button>`;
+    <button class="n-tgl"></button><div class="n-rs"></div>`;
   world.appendChild(el);nodeEl.set(n.id,el);bindNode(el,n);applyNode(n);
   if(n.x!==undefined&&n.x!==null){el.style.left=n.x+'px';el.style.top=n.y+'px'}
   return el;
@@ -491,6 +548,9 @@ function makeNodeEl(n){
 function applyNode(n){
   const el=nodeEl.get(n.id);if(!el)return;
   el.style.setProperty('--nc',n.color||'#ffd94d');
+  el.style.width=n.nw?n.nw+'px':'';
+el.style.minHeight=(n.shape!=='circle'&&n.nh)?n.nh+'px':'';
+el.classList.toggle('sized',!!(n.nw||n.nh));
   el.querySelector('.n-accent').style.background=n.color||'#ffd94d';
   el.querySelector('.n-title').textContent=n.title||'без названия';
   const notes=el.querySelector('.n-notes');notes.textContent=n.notes||'';notes.classList.toggle('hidden',!n.notes);
@@ -672,11 +732,10 @@ function floatingCenter(){const w=toWorld(innerWidth/2,innerHeight/2);return{x:w
 
 /* ===== холст ===== */
 function applyView(){
-  world.style.transform=`translate(${state.view.x}px,${state.view.y}px) scale(${state.view.z})`;
-  boardEl.style.backgroundPosition=`${state.view.x}px ${state.view.y}px,0 0,0 0`;
-  boardEl.style.backgroundSize=`${64*state.view.z}px ${64*state.view.z}px,auto,auto`;
-  $('#zoomLbl').textContent=Math.round(state.view.z*100)+'%';
-  updateMinimap();
+world.style.transform=`translate(${state.view.x}px,${state.view.y}px) scale(${state.view.z})`;
+$('#zoomLbl').textContent=Math.round(state.view.z*100)+'%';
+syncBG();
+updateMinimap();
 }
 function toWorld(cx,cy){const r=boardEl.getBoundingClientRect();
   return{x:(cx-r.left-state.view.x)/state.view.z,y:(cy-r.top-state.view.y)/state.view.z}}
@@ -718,7 +777,7 @@ function endPtr(e){
   ptrs.delete(e.pointerId);
   if(ptrs.size<2){pinch0=null;
     if(ptrs.size===1){const[p]=[...ptrs.values()];panS={sx:p.x,sy:p.y,vx:state.view.x,vy:state.view.y,moved:true}}
-    else{if(panS&&!panS.moved){queueSave();if(e.target===boardEl||e.target===world||e.target===svg)setSelected(null)}
+    else{if(panS&&!panS.moved){queueSave();if(e.target===boardEl||e.target===world||e.target===svg){clearMulti();setSelected(null)}}
       panS=null;boardEl.classList.remove('grabbing')}}
 }
 window.addEventListener('pointerup',endPtr);window.addEventListener('pointercancel',endPtr);
@@ -745,39 +804,70 @@ function tap(el,fn){
 
 /* ===== узлы ===== */
 function bindNode(el,n){
-  el.addEventListener('pointerdown',e=>{
-    if(e.target.closest('.n-tgl'))return;
-    if(e.button!==undefined&&e.button!==0)return;
-    e.stopPropagation();
-    const sx=e.clientX,sy=e.clientY;let st='maybe',raf=false;
-    el.setPointerCapture(e.pointerId);
-    const w0=toWorld(sx,sy),offX=w0.x-(n.x||0),offY=w0.y-(n.y||0);
-    const mv=ev=>{
-      if(st==='maybe'&&Math.hypot(ev.clientX-sx,ev.clientY-sy)>9){st='drag';el.classList.add('dragging');buzz(8)}
-      if(st==='drag'){
-        const w=toWorld(ev.clientX,ev.clientY);
-        n.x=w.x-offX;n.y=w.y-offY;
-        el.style.left=n.x+'px';el.style.top=n.y+'px';
-        if(!raf){raf=true;requestAnimationFrame(()=>{raf=false;drawEdges();if(burstId===n.id)updateBurstPositions()})}
-      }
-    };
-    const up=()=>{
-      el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);
-      el.classList.remove('dragging');
-      if(st==='drag'){buzz(6);queueSave();updateMinimap()}
-      else if(st==='maybe')setSelected(selected===n.id?null:n.id);
-    };
-    el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
-  });
-  el.addEventListener('contextmenu',e=>e.preventDefault());
-  el.addEventListener('dblclick',e=>{e.stopPropagation();openQuickAdd(n.id)});
-  const tgl=el.querySelector('.n-tgl');
-  tap(tgl,()=>{n.collapsed=!n.collapsed;applyNode(n);refresh();queueSave();buzz(6);updateSelbar()});
-  tap(el.querySelector('.n-status'),()=>cycleStatus(n));
-  el.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();el.classList.add('droptarget')}});
-  el.addEventListener('dragleave',()=>el.classList.remove('droptarget'));
-  el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('droptarget');
-    if(e.dataTransfer.files.length){addFilesToNode(n,e.dataTransfer.files);setSelected(n.id)}});
+el.addEventListener('pointerdown',e=>{
+if(e.target.closest('.n-tgl'))return;
+if(e.target.closest('.n-rs'))return;
+if(e.button!==undefined&&e.button!==0)return;
+e.stopPropagation();
+const sx=e.clientX,sy=e.clientY;let st='maybe',raf=false;
+const holdTO=setTimeout(()=>{if(st==='maybe'){st='hold';buzz(14);hideBurst();setSelected(null);toggleMulti(n.id);}},430);
+el.setPointerCapture(e.pointerId);
+const w0=toWorld(sx,sy),offX=w0.x-(n.x||0),offY=w0.y-(n.y||0);
+let prev=w0;
+const mv=ev=>{
+const w=toWorld(ev.clientX,ev.clientY);
+if((st==='maybe'||st==='hold')&&Math.hypot(ev.clientX-sx,ev.clientY-sy)>9){st='drag';clearTimeout(holdTO);el.classList.add('dragging');buzz(8)}
+if(st==='drag'){
+if(multiSel.size>1&&multiSel.has(n.id)){
+const dx=w.x-prev.x,dy=w.y-prev.y;
+multiSel.forEach(id=>{const m=nodeById(id);if(!m)return;m.x+=dx;m.y+=dy;
+const me=nodeEl.get(id);if(me){me.style.left=m.x+'px';me.style.top=m.y+'px'}});
+}else{
+n.x=w.x-offX;n.y=w.y-offY;
+el.style.left=n.x+'px';el.style.top=n.y+'px';
+}
+prev=w;
+if(!raf){raf=true;requestAnimationFrame(()=>{raf=false;drawEdges();if(burstId)updateBurstPositions()})}
+}
+};
+const up=()=>{
+clearTimeout(holdTO);
+el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);
+el.classList.remove('dragging');
+if(st==='drag'){buzz(6);queueSave();updateMinimap()}
+else if(st==='maybe'){
+if(multiSel.size>0)toggleMulti(n.id);
+else setSelected(selected===n.id?null:n.id);
+}
+};
+el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+});
+el.addEventListener('contextmenu',e=>e.preventDefault());
+el.addEventListener('dblclick',e=>{e.stopPropagation();openQuickAdd(n.id)});
+const tgl=el.querySelector('.n-tgl');
+tap(tgl,()=>{n.collapsed=!n.collapsed;applyNode(n);refresh();queueSave();buzz(6);updateSelbar()});
+tap(el.querySelector('.n-status'),()=>cycleStatus(n));
+const rs=el.querySelector('.n-rs');
+if(rs){rs.addEventListener('pointerdown',e=>{
+if(e.button!==undefined&&e.button!==0)return;
+e.stopPropagation();
+const isCircle=(n.shape||'rect')==='circle';
+const sw=el.offsetWidth,sh=el.offsetHeight,sx2=e.clientX,sy2=e.clientY;
+rs.setPointerCapture(e.pointerId);
+const mv2=ev=>{
+n.nw=clamp(Math.round(sw+(ev.clientX-sx2)/state.view.z),90,700);
+if(!isCircle)n.nh=clamp(Math.round(sh+(ev.clientY-sy2)/state.view.z),44,800);
+applyNode(n);
+n._w=el.offsetWidth;n._h=el.offsetHeight;
+drawEdges();if(burstId===n.id)updateBurstPositions();
+};
+const up2=()=>{rs.removeEventListener('pointermove',mv2);rs.removeEventListener('pointerup',up2);rs.removeEventListener('pointercancel',up2);queueSave();updateMinimap()};
+rs.addEventListener('pointermove',mv2);rs.addEventListener('pointerup',up2);rs.addEventListener('pointercancel',up2);
+});}
+el.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();el.classList.add('droptarget')}});
+el.addEventListener('dragleave',()=>el.classList.remove('droptarget'));
+el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('droptarget');
+if(e.dataTransfer.files.length){addFilesToNode(n,e.dataTransfer.files);setSelected(n.id)}});
 }
 function cycleStatus(n){
 const i=STATUS_ORDER.indexOf(n.status||null);
@@ -928,6 +1018,9 @@ function openEditor(id){
   $('#edCap').textContent=n.id===state.rootId?'Корень карты':'Узел';
   $('#edTitle').value=n.title;$('#edDesc').value=n.notes||'';
   $('#edMeta').textContent=`создан ${fmtDate(n.createdAt)} · изменён ${fmtDate(n.updatedAt)}`;
+  editSnap=snapNode(n);renderVersions(n);
+$('#edUpdated').textContent='Последнее изменение: '+fmtDate(n.updatedAt);
+$('#edSizeReset').onclick=()=>{const nn=nodeById(editing);if(!nn)return;nn.nw=null;nn.nh=null;applyNode(nn);refresh();queueSave();toast('Размер сброшен')};
   $('#edDue').value=n.due?toLocalInput(n.due):'';
 renderDuePresets(n);
   renderShapeSeg($('#edShapes'),n,k=>setShape(n,k));
@@ -1012,11 +1105,12 @@ $('#mediaCam').onchange=e=>{const f=[...e.target.files];e.target.value='';
   const n=nodeById(mediaTarget);if(n&&f.length)addFilesToNode(n,f)};
 
 function saveEditorFields(){
-  const n=nodeById(editing);if(!n)return;
-  n.title=$('#edTitle').value.trim()||'без названия';
-  n.notes=$('#edDesc').value.trim();n.updatedAt=Date.now();
-  n.checklist=(n.checklist||[]).filter(x=>x.t.trim());
-  applyNode(n);refresh();queueSave();
+const n=nodeById(editing);if(!n)return;
+n.title=$('#edTitle').value.trim()||'без названия';
+n.notes=$('#edDesc').value.trim();n.updatedAt=Date.now();
+n.checklist=(n.checklist||[]).filter(x=>x.t.trim());
+if(editSnap&&!nodesEqual(editSnap,n)){pushVersion(n,editSnap);editSnap=snapNode(n);renderVersions(n);}
+applyNode(n);refresh();queueSave();
 }
 $('#edSave').onclick=()=>{saveEditorFields();closeOverlay($('#edOverlay'))};
 $('#edOverlay').querySelector('[data-close]').onclick=()=>{saveEditorFields();closeOverlay($('#edOverlay'))};
@@ -1170,6 +1264,175 @@ window.__apkOpenNode=(id)=>{const n=nodeById(id);if(n)focusNode(id)};
 $('#edDue').addEventListener('change',()=>{const n=nodeById(editing);if(!n)return;
 const v=$('#edDue').value;setDue(n,v?new Date(v).getTime():null)});
 $('#edDueClear').onclick=()=>{const n=nodeById(editing);if(n)setDue(n,null)};
+  /* ===== версии узлов ===== */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+let editSnap=null;
+function snapNode(n){return{ts:Date.now(),title:n.title||'',notes:n.notes||'',status:n.status||null,shape:n.shape||'rect',
+color:n.color||'#ffd94d',nw:n.nw||null,nh:n.nh||null,checklist:(n.checklist||[]).map(c=>({t:c.t,d:!!c.d}))}}
+function nodesEqual(a,n){return a.title===(n.title||'')&&a.notes===(n.notes||'')&&(a.status||null)===(n.status||null)
+&&(a.shape||'rect')===(n.shape||'rect')&&(a.color||'')===(n.color||'')&&(a.nw||null)===(n.nw||null)&&(a.nh||null)===(n.nh||null)
+&&JSON.stringify(a.checklist)===JSON.stringify((n.checklist||[]).map(c=>({t:c.t,d:!!c.d})))}
+function pushVersion(n,snap){n.versions=n.versions||[];n.versions.push(snap);if(n.versions.length>20)n.versions.shift()}
+function renderVersions(n){
+const box=$('#edVersions');if(!box)return;box.innerHTML='';
+const vs=n.versions||[];
+if(!vs.length){box.innerHTML='<div class="meta-line" style="margin:0">Прошлых версий пока нет — они появляются после изменений.</div>';return}
+[...vs].reverse().forEach((v,ri)=>{
+const i=vs.length-1-ri;
+const row=document.createElement('div');row.className='ver-row';
+row.innerHTML='<div class="ver-main"><b>'+fmtDate(v.ts)+'</b><span>'+esc(v.title||'без названия')+'</span></div><button class="btn ghost" style="padding:7px 10px;font-size:12px">Откатить</button>';
+row.querySelector('button').onclick=()=>rollbackNode(n,i);
+box.appendChild(row)});
+}
+function rollbackNode(n,i){
+const vs=n.versions||[];const v=vs[i];if(!v)return;
+pushVersion(n,snapNode(n));
+n.title=v.title||'';n.notes=v.notes||'';n.status=v.status||null;n.shape=v.shape||'rect';n.color=v.color||'#ffd94d';
+n.nw=v.nw||null;n.nh=v.nh||null;
+n.checklist=(v.checklist||[]).map(c=>({t:c.t,d:!!c.d}));
+vs.splice(i,1);
+n.updatedAt=Date.now();
+$('#edTitle').value=n.title;$('#edDesc').value=n.notes;
+$('#edUpdated').textContent='Последнее изменение: '+fmtDate(n.updatedAt);
+renderStatusSeg(n);renderEditorColors(n);
+renderShapeSeg($('#edShapes'),n,k=>setShape(n,k));
+renderChecklist(n);renderVersions(n);
+applyNode(n);refresh();queueSave();
+editSnap=snapNode(n);
+toast('Откатили к версии от '+fmtDate(v.ts));buzz(8);
+}
+/* ===== мультивыбор ===== */
+const multiSel=new Set();
+function toggleMulti(id){
+if(multiSel.has(id))multiSel.delete(id);else multiSel.add(id);
+const el=nodeEl.get(id);if(el)el.classList.toggle('msel',multiSel.has(id));
+if(multiSel.size===0)exitMulti();else updateMultiBar();
+buzz(5);
+}
+function exitMulti(){
+multiSel.forEach(id=>{const el=nodeEl.get(id);el&&el.classList.remove('msel')});
+multiSel.clear();
+$('#multibar').classList.remove('show');
+}
+function clearMulti(){exitMulti()}
+function updateMultiBar(){
+$('#mbCount').textContent='узлов: '+multiSel.size;
+$('#multibar').classList.add('show');
+}
+$('#mbDone').onclick=()=>exitMulti();
+$('#mbDel').onclick=()=>{
+const ids=[...multiSel].filter(i=>i!==state.rootId);
+if(!ids.length){toast('Корень удалить нельзя');return}
+if(!confirm('Удалить выбранные узлы ('+ids.length+') вместе с их ветками?'))return;
+const snap=JSON.parse(JSON.stringify(state.nodes));
+const snapAtt=state.attachments.slice();
+const all=new Set();
+ids.forEach(id=>{descendants(id).forEach(d=>all.add(d));all.add(id)});
+const goneAtts=state.attachments.filter(a=>all.has(a.nodeId)).map(a=>a.id);
+state.nodes=state.nodes.filter(x=>!all.has(x.id));
+state.attachments=state.attachments.filter(a=>!all.has(a.nodeId));
+all.forEach(i=>{const el=nodeEl.get(i);el&&el.remove();nodeEl.delete(i);
+try{if(APK&&APK.cancelReminder)APK.cancelReminder(i)}catch(e){}});
+exitMulti();setSelected(null);
+refresh();queueSave();
+lastUndo={snap,snapAtt};pending=goneAtts;
+clearTimeout(pendingTO);pendingTO=setTimeout(()=>{if(pending){pending.forEach(attDel);pending=null}},6000);
+toast('Удалено узлов: '+all.size,'Отменить');
+};
+/* ===== фон карты ===== */
+let bgURL=null;
+function kvDelete(k){return new Promise(res=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').delete(k);tx.oncomplete=res})}
+async function loadBGImage(){
+try{const r=await kvGet('bgImage');
+if(r&&r.blob){if(bgURL)URL.revokeObjectURL(bgURL);bgURL=blobToURL(r.blob);
+state.settings.bgName=r.name||'';state.settings.bgSize=r.size||0;}
+}catch(e){}
+}
+function applyBG(){
+const bg=state.settings.bg||{type:'dots'};
+const b=boardEl;
+b.style.backgroundImage='none';b.style.backgroundColor='';
+b.dataset.bgpat='';
+if(bg.type==='image'&&bgURL){
+b.style.backgroundColor='#e8e5dc';
+b.style.backgroundImage='url("'+bgURL+'")';
+b.style.backgroundSize='cover';b.style.backgroundPosition='center';
+}else if(bg.type==='color'){
+b.style.backgroundColor=bg.color||'#f3f1ea';
+}else if(bg.type==='gradient'){
+b.style.backgroundImage='linear-gradient(180deg,'+(bg.c1||'#f3f1ea')+','+(bg.c2||'#9fd6ff')+')';
+}else if(bg.type==='none'){
+b.style.backgroundColor='#f3f1ea';
+}else{
+b.style.backgroundColor='#f3f1ea';
+if(bg.type==='grid')b.style.backgroundImage='linear-gradient(rgba(23,49,58,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(23,49,58,.10) 1px,transparent 1px)';
+else if(bg.type==='lines')b.style.backgroundImage='linear-gradient(rgba(23,49,58,.13) 1px,transparent 1px)';
+else b.style.backgroundImage='radial-gradient(circle,#c9c3b1 1.2px,transparent 1.4px)';
+b.dataset.bgpat=bg.type;
+}
+syncBG();
+}
+function syncBG(){
+const t=boardEl.dataset.bgpat,z=state.view.z;
+if(!t)return;
+if(t==='dots'){boardEl.style.backgroundSize=(64*z)+'px '+(64*z)+'px';boardEl.style.backgroundPosition=state.view.x+'px '+state.view.y+'px';}
+else{const c=32*z;
+if(t==='grid'){boardEl.style.backgroundSize=c+'px '+c+'px, '+c+'px '+c+'px';boardEl.style.backgroundPosition=state.view.x+'px '+state.view.y+'px, '+state.view.x+'px '+state.view.y+'px';}
+else{boardEl.style.backgroundSize=c+'px '+c+'px';boardEl.style.backgroundPosition=state.view.x+'px '+state.view.y+'px';}
+}
+}
+$('#miBG').onclick=()=>{closeOverlay($('#menuOverlay'));openBGSheet()};
+function openBGSheet(){
+const bg=state.settings.bg||{type:'dots'};
+$('#bgColor').value=bg.color||'#f3f1ea';
+$('#bgC1').value=bg.c1||'#f3f1ea';
+$('#bgC2').value=bg.c2||'#9fd6ff';
+updateBGFlds(bg.type);
+$('#bgImgInfo').textContent=state.settings.bgSize?('Сохранено: '+(state.settings.bgName||'изображение')+' · '+fmtBytes(state.settings.bgSize)):'Изображение не выбрано';
+$('#bgImgClear').classList.toggle('hidden',bg.type!=='image');
+openOverlay($('#bgOverlay'));
+}
+function updateBGFlds(t){
+$('#bgColorFld').classList.toggle('hidden',t!=='color');
+$('#bgGradFld').classList.toggle('hidden',t!=='gradient');
+document.querySelectorAll('.bg-tile').forEach(x=>x.classList.toggle('sel',x.dataset.bg===t));
+}
+function setBG(o){state.settings.bg=o;applyBG();queueSave();updateBGFlds(o.type)}
+document.querySelectorAll('.bg-tile').forEach(tl=>{
+tl.addEventListener('click',()=>{
+const t=tl.dataset.bg;
+if(t==='color')setBG({type:'color',color:$('#bgColor').value});
+else if(t==='gradient')setBG({type:'gradient',c1:$('#bgC1').value,c2:$('#bgC2').value});
+else setBG({type:t});
+});
+});
+$('#bgColor').addEventListener('input',()=>{if((state.settings.bg||{}).type==='color')setBG({type:'color',color:$('#bgColor').value})});
+$('#bgC1').addEventListener('input',()=>{if((state.settings.bg||{}).type==='gradient')setBG({type:'gradient',c1:$('#bgC1').value,c2:$('#bgC2').value})});
+$('#bgC2').addEventListener('input',()=>{if((state.settings.bg||{}).type==='gradient')setBG({type:'gradient',c1:$('#bgC1').value,c2:$('#bgC2').value})});
+$('#bgImgBtn').onclick=()=>$('#bgInput').click();
+$('#bgInput').onchange=async e=>{
+const f=e.target.files[0];e.target.value='';
+if(!f)return;
+try{
+await kvSet('bgImage',{name:f.name,size:f.size,blob:f});
+if(bgURL)URL.revokeObjectURL(bgURL);
+bgURL=blobToURL(f);
+state.settings.bgName=f.name;state.settings.bgSize=f.size;
+setBG({type:'image'});
+$('#bgImgInfo').textContent='Сохранено: '+f.name+' · '+fmtBytes(f.size);
+$('#bgImgClear').classList.remove('hidden');
+toast('Фон установлен: '+fmtBytes(f.size));
+checkQuota();
+}catch(err){toast('Не удалось сохранить изображение')}
+};
+$('#bgImgClear').onclick=async()=>{
+try{await kvDelete('bgImage')}catch(e){}
+state.settings.bgSize=0;
+setBG({type:'none'});
+$('#bgImgClear').classList.add('hidden');
+$('#bgImgInfo').textContent='Изображение не выбрано';
+};
+$('#bgOverlay').querySelector('[data-close]').onclick=()=>closeOverlay($('#bgOverlay'));    
 /* ===== открытие документов во внешних приложениях ===== */
 async function openDoc(a,edit){
   if(!APK||!APK.openDoc){toast('Доступно только в APK-версии');return}
@@ -1447,6 +1710,7 @@ function rebuildAll(){
     syncAllReminders();
 checkReminders();
 refreshBell();
+   loadBGImage().then(()=>applyBG());
     if(state.settings.minimap)mm.classList.remove('hidden');
     window.__booted=true;
   }catch(e){
