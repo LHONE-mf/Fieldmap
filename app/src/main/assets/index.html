@@ -779,11 +779,11 @@ return best;
 }
 function reparentNodes(dragged,target){
 if(!target||!dragged||dragged.id===target.id)return;
-const excl=descendants(dragged.id);excl.add(dragged.id);
-if(excl.has(target.id)){toast('Нельзя подчинить ветку её собственному потомку');refresh();return}
+const desc=descendants(dragged.id);
+if(desc.has(target.id)){toast('Нельзя подчинить ветку её собственному потомку');refresh();return}
 let ids=[dragged.id];
 if(multiSel.size>1&&multiSel.has(dragged.id))ids=[...multiSel];
-const moveIds=ids.filter(i=>i!==target.id&&!excl.has(i)&&i!==state.rootId);
+const moveIds=ids.filter(i=>i!==target.id&&!desc.has(i)&&i!==state.rootId);
 if(!moveIds.length){refresh();return}
 target.collapsed=false;
 let placed=0;
