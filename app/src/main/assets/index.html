@@ -266,8 +266,7 @@ setTimeout(function(){
 <div id="board">
   <div id="world"><svg id="edges" aria-hidden="true"></svg></div>
 </div>
-<div id="boardHint">тяните фон — панорама · тап по узлу — раскрыть его файлы лучами · двойной тап — новый узел</div>
-
+<div id="boardHint">тяните фон — панорама · перетащите узел на другой, чтобы подчинить · двойной тап — новый узел</div>
 <div id="rail">
   <button id="zoomIn">+</button>
   <div id="zoomLbl">100%</div>
@@ -803,6 +802,43 @@ function tap(el,fn){
 }
 
 /* ===== узлы ===== */
+/* ===== подчинение перетаскиванием ===== */
+function hitNodeForDrop(w,exclude){
+let best=null,ba=1e12;
+state.nodes.forEach(m=>{
+if(exclude.has(m.id)||!lastVis.has(m.id))return;
+const pad=12;
+if(w.x>m.x-pad&&w.x<m.x+m._w+pad&&w.y>m.y-pad&&w.y<m.y+m._h+pad){
+const a=(m._w||1)*(m._h||1);
+if(a<ba){ba=a;best=m}
+}
+});
+return best;
+}
+function reparentNodes(dragged,target){
+if(!target||!dragged||dragged.id===target.id)return;
+const excl=descendants(dragged.id);excl.add(dragged.id);
+if(excl.has(target.id)){toast('Нельзя подчинить ветку её собственному потомку');refresh();return}
+let ids=[dragged.id];
+if(typeof multiSel!=='undefined'&&multiSel.size>1&&multiSel.has(dragged.id))ids=[...multiSel];
+const moveIds=ids.filter(i=>i!==target.id&&!excl.has(i)&&i!==state.rootId);
+if(!moveIds.length){refresh();return}
+target.collapsed=false;
+let placed=0;
+moveIds.forEach(id=>{
+const m=nodeById(id);if(!m||m.parentId===target.id)return;
+m.parentId=target.id;
+const pos=childPos(target);
+m.x=pos.x;m.y=pos.y;
+state.nodes.splice(state.nodes.indexOf(m),1);state.nodes.push(m);
+placed++;
+});
+refresh();queueSave();
+if(placed){
+buzz([10,40,10]);
+toast(placed>1?('Подчинено узлов: '+placed+' → '+(target.title||'узел')):('Подчинено → '+(target.title||'узел')));
+}
+}
 function bindNode(el,n){
 el.addEventListener('pointerdown',e=>{
 if(e.target.closest('.n-tgl'))return;
@@ -810,6 +846,8 @@ if(e.target.closest('.n-rs'))return;
 if(e.button!==undefined&&e.button!==0)return;
 e.stopPropagation();
 const sx=e.clientX,sy=e.clientY;let st='maybe',raf=false;
+let dropTarget=null;
+const excl=descendants(n.id);excl.add(n.id);
 const holdTO=setTimeout(()=>{if(st==='maybe'){st='hold';buzz(14);hideBurst();setSelected(null);toggleMulti(n.id);}},430);
 el.setPointerCapture(e.pointerId);
 const w0=toWorld(sx,sy),offX=w0.x-(n.x||0),offY=w0.y-(n.y||0);
@@ -818,7 +856,7 @@ const mv=ev=>{
 const w=toWorld(ev.clientX,ev.clientY);
 if((st==='maybe'||st==='hold')&&Math.hypot(ev.clientX-sx,ev.clientY-sy)>9){st='drag';clearTimeout(holdTO);el.classList.add('dragging');buzz(8)}
 if(st==='drag'){
-if(multiSel.size>1&&multiSel.has(n.id)){
+if(typeof multiSel!=='undefined'&&multiSel.size>1&&multiSel.has(n.id)){
 const dx=w.x-prev.x,dy=w.y-prev.y;
 multiSel.forEach(id=>{const m=nodeById(id);if(!m)return;m.x+=dx;m.y+=dy;
 const me=nodeEl.get(id);if(me){me.style.left=m.x+'px';me.style.top=m.y+'px'}});
@@ -827,6 +865,13 @@ n.x=w.x-offX;n.y=w.y-offY;
 el.style.left=n.x+'px';el.style.top=n.y+'px';
 }
 prev=w;
+let t=null;
+if(n.id!==state.rootId)t=hitNodeForDrop(w,excl);
+if(t!==dropTarget){
+if(dropTarget){const de=nodeEl.get(dropTarget.id);de&&de.classList.remove('droptarget')}
+dropTarget=t;
+if(t){const te=nodeEl.get(t.id);te&&te.classList.add('droptarget');buzz(5)}
+}
 if(!raf){raf=true;requestAnimationFrame(()=>{raf=false;drawEdges();if(burstId)updateBurstPositions()})}
 }
 };
@@ -834,9 +879,14 @@ const up=()=>{
 clearTimeout(holdTO);
 el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);
 el.classList.remove('dragging');
-if(st==='drag'){buzz(6);queueSave();updateMinimap()}
+const dt=dropTarget;dropTarget=null;
+if(dt){const de=nodeEl.get(dt.id);de&&de.classList.remove('droptarget')}
+if(st==='drag'){
+if(dt&&n.id!==state.rootId){reparentNodes(n,dt)}
+else{buzz(6);queueSave();updateMinimap()}
+}
 else if(st==='maybe'){
-if(multiSel.size>0)toggleMulti(n.id);
+if(typeof multiSel!=='undefined'&&multiSel.size>0)toggleMulti(n.id);
 else setSelected(selected===n.id?null:n.id);
 }
 };
